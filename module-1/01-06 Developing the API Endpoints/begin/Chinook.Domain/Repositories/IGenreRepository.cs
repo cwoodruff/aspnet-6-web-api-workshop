@@ -1,13 +1,12 @@
 ﻿using Chinook.Domain.Entities;
 
-namespace Chinook.Domain.Repositories
+namespace Chinook.Domain.Repositories;
+
+public interface IGenreRepository : IDisposable
 {
-    public interface IGenreRepository : IDisposable
-    {
-        Task<List<Genre>> GetAll();
-        Task<Genre> GetById(int id);
-        Task<Genre> Add(Genre newGenre);
-        Task<bool> Update(Genre genre);
-        Task<bool> Delete(int id);
-    }
+    Task<List<Genre>> GetAll();
+    Task<Genre> GetById(int id);
+    Task<Genre> Add(Genre newGenre);
+    Task<bool> Update(Genre genre);
+    Task<bool> Delete(int id);
 }

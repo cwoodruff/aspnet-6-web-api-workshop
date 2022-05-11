@@ -1,15 +1,14 @@
-﻿namespace Chinook.Domain.Entities
+﻿namespace Chinook.Domain.Entities;
+
+public partial class Artist
 {
-    public partial class Artist
+    public Artist()
     {
-        public Artist()
-        {
-            Albums = new HashSet<Album>();
-        }
-
-        public int Id { get; set; }
-        public string? Name { get; set; }
-
-        public virtual ICollection<Album> Albums { get; set; }
+        Albums = new HashSet<Album>();
     }
+
+    public int Id { get; set; }
+    public string? Name { get; set; }
+
+    public virtual ICollection<Album> Albums { get; set; }
 }
