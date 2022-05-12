@@ -10,11 +10,14 @@ builder.Services.AddAPILogging();
 builder.Services.AddCORS();
 builder.Services.ConfigureValidators();
 builder.Services.AddCaching(builder.Configuration);
+//builder.Services.AddIdentity(builder.Configuration);
 builder.Services.AddControllers();
 
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
+app.UseAuthentication();
+
 app.UseCors();
 
 app.UseResponseCaching();

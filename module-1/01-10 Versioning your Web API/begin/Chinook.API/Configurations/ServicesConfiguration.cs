@@ -1,3 +1,5 @@
+using System.Text;
+using Chinook.Data.Data;
 using Chinook.Domain.Repositories;
 using Chinook.Domain.Supervisor;
 using Chinook.Data.Repositories;
@@ -5,7 +7,10 @@ using Chinook.Domain.ApiModels;
 using Chinook.Domain.Validation;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.HttpLogging;
+using Microsoft.AspNetCore.Identity;
+using Microsoft.IdentityModel.Tokens;
 
 namespace Chinook.API.Configurations;
 
@@ -86,5 +91,36 @@ public static class ServicesConfiguration
             options.SchemaName = "dbo";
             options.TableName = "ChinookCache";
         });
+    }
+
+    public static void AddIdentity(this IServiceCollection services,
+        IConfiguration configuration)
+    {
+        services.Configure<JwtConfig>(configuration.GetSection("JwtConfig"));
+
+        services.AddAuthentication(options =>
+            {
+                options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
+                options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+            })
+            .AddJwtBearer(jwt =>
+            {
+                var key = Encoding.ASCII.GetBytes(configuration["JwtConfig:Secret"]);
+
+                jwt.SaveToken = true;
+                jwt.TokenValidationParameters = new TokenValidationParameters
+                {
+                    ValidateIssuerSigningKey = true,
+                    IssuerSigningKey = new SymmetricSecurityKey(key),
+                    ValidateIssuer = false,
+                    ValidateAudience = false,
+                    RequireExpirationTime = false,
+                    ValidateLifetime = true
+                };
+            });
+
+        services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = true)
+            .AddEntityFrameworkStores<ChinookContext>();
     }
 }
