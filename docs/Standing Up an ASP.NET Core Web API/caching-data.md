@@ -24,28 +24,34 @@ public static void AddCaching(this IServiceCollection services,
 **** Note: needs to go after CORS**
 
 ```csharp
-public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-{
-    if (env.IsDevelopment())
-    {
-        app.UseDeveloperExceptionPage();
-    }
+using Chinook.API.Configurations;
 
-    app.UseHttpsRedirection();
+var builder = WebApplication.CreateBuilder(args);
 
-    app.UseRouting();
+builder.Services.AddAppSettings(builder.Configuration);
+builder.Services.AddConnectionProvider(builder.Configuration);
+builder.Services.ConfigureRepositories();
+builder.Services.ConfigureSupervisor();
+builder.Services.AddAPILogging();
+builder.Services.AddCORS();
+builder.Services.ConfigureValidators();
+builder.Services.AddCaching(builder.Configuration);
+builder.Services.AddControllers();
 
-    app.UseCors("CorsPolicy");
+var app = builder.Build();
 
-    app.UseResponseCaching();
+// Configure the HTTP request pipeline.
+app.UseCors();
 
-    app.UseAuthorization();
+app.UseResponseCaching();
 
-    app.UseEndpoints(endpoints =>
-    {
-        endpoints.MapControllers();
-    });
-}
+app.UseHttpsRedirection();
+
+app.UseAuthorization();
+
+app.MapControllers();
+
+app.Run();
 ```
 
 ### ADD TO CONTROLLERS OR ACTIONS
@@ -165,7 +171,6 @@ public partial class ChinookSupervisor : IChinookSupervisor
 }
 ```
 
-
 ### ADD CODE TO SUPERVISOR FOR EACH ENTITY TYPE NEEDED
 
 #### ChinookSupervisorAlbum.cs
@@ -178,16 +183,17 @@ public async Task<IEnumerable<AlbumApiModel>> GetAllAlbum()
 
     foreach (var album in albumApiModels)
     {
-        var cacheEntryOptions = 
+        var cacheEntryOptions =
             new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromSeconds(604800))
-                .AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(604800);;
+                .AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(604800);
+        ;
         _cache.Set(string.Concat("Album-", album.Id), album, (TimeSpan)cacheEntryOptions);
     }
 
     return albumApiModels;
 }
 
-public async Task<AlbumApiModel> GetAlbumById(int id)
+public async Task<AlbumApiModel?> GetAlbumById(int id)
 {
     var albumApiModelCached = _cache.Get<AlbumApiModel>(string.Concat("Album-", id));
 
@@ -197,16 +203,18 @@ public async Task<AlbumApiModel> GetAlbumById(int id)
     }
     else
     {
-
         var album = await _albumRepository.GetById(id);
         if (album == null) return null;
         var albumApiModel = album.Convert();
-        albumApiModel.ArtistName = (_artistRepository.GetById(album.ArtistId)).Result.Name;
-        albumApiModel.Tracks = (await GetTrackByAlbumId(id)).ToList();
+        var result = (_artistRepository.GetById(album.ArtistId)).Result;
+        if (result != null)
+            albumApiModel.ArtistName = result.Name;
+        albumApiModel.Tracks = (await GetTrackByAlbumId(id) ?? Array.Empty<TrackApiModel>()).ToList();
 
-        var cacheEntryOptions = 
+        var cacheEntryOptions =
             new MemoryCacheEntryOptions().SetSlidingExpiration(TimeSpan.FromSeconds(604800))
-                .AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(604800);;
+                .AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(604800);
+        ;
         _cache.Set(string.Concat("Album-", albumApiModel.Id), albumApiModel, (TimeSpan)cacheEntryOptions);
 
         return albumApiModel;
@@ -250,6 +258,25 @@ dotnet sql-cache create "Data Source=.;Initial Catalog=ChinookCacheDb;Integrated
 
 ```dos
 dotnet add package Microsoft.Extensions.Caching.SqlServer
+```
+
+### ADD ChinookSQLCache CONNECTIONSTRING TO APPSETTINGS
+```json
+{
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning",
+      "Microsoft.AspNetCore.HttpLogging.HttpLoggingMiddleware": "Information"
+    }
+  },
+  "AllowedHosts": "*",
+  "ConnectionStrings": {
+    "ChinookDbWindows": "Server=.;Database=Chinook;Trusted_Connection=True;Application Name=ChinookASPNETCoreAPINTier",
+    "ChinookDbDocker": "Server=localhost,1433;Database=Chinook;User=sa;Password=P@55w0rd;Trusted_Connection=False;Application Name=ChinookASPNETCoreAPINTier",
+    "ChinookSQLCache": "Data Source=.;Initial Catalog=ChinookCacheDb;Integrated Security=True;"
+  }
+}
 ```
 
 ### ADD DISTRIBUTED CACHING TO ADDCACHING() IN SERVICESCONFIGURATION.CS
@@ -358,57 +385,53 @@ public partial class ChinookSupervisor : IChinookSupervisor
 #### ChinookSupervisorTrack.cs
 
 ```csharp
-public async Task<IEnumerable<TrackApiModel>> GetAllTrack()
-{
-    List<Track> tracks = await _trackRepository.GetAll();
-    var trackApiModels = tracks.ConvertAll();
-
-    foreach (var track in trackApiModels)
+    public async Task<IEnumerable<TrackApiModel>> GetAllTrack()
     {
-        DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions();
-        cacheEntryOptions.SetSlidingExpiration(TimeSpan.FromSeconds(3600));
-        cacheEntryOptions.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(86400);
+        List<Track> tracks = await _trackRepository.GetAll();
+        var trackApiModels = tracks.ConvertAll();
 
-        await _distributedCache.SetStringAsync($"Track-{track.Id}", JsonSerializer.Serialize(track), cacheEntryOptions);
-    }
-
-    return trackApiModels;
-}
-
-public async Task<TrackApiModel> GetTrackById(int id)
-{
-    var trackApiModelCached = await _distributedCache.GetStringAsync($"Track-{id}");
-
-    if (trackApiModelCached != null)
-    {
-        return JsonSerializer.Deserialize<TrackApiModel>(trackApiModelCached);
-    }
-    else
-    {
-        var track = await _trackRepository.GetById(id);
-        if (track == null) return null;
-        var trackApiModel = track.Convert();
-        trackApiModel.Genre = await GetGenreById(trackApiModel.GenreId);
-        trackApiModel.Album = await GetAlbumById(trackApiModel.AlbumId);
-        trackApiModel.MediaType = await GetMediaTypeById(trackApiModel.MediaTypeId);
-        if (trackApiModel.Album != null)
+        foreach (var track in trackApiModels)
         {
-            trackApiModel.AlbumName = trackApiModel.Album.Title;
+            DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions();
+            cacheEntryOptions.SetSlidingExpiration(TimeSpan.FromSeconds(3600));
+            cacheEntryOptions.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(86400);
+
+            await _distributedCache.SetStringAsync($"Track-{track.Id}", JsonSerializer.Serialize(track),
+                cacheEntryOptions);
         }
 
-        trackApiModel.MediaTypeName = trackApiModel.MediaType.Name;
-        if (trackApiModel.Genre != null)
-        {
-            trackApiModel.GenreName = trackApiModel.Genre.Name;
-        }
-
-        DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions();
-        cacheEntryOptions.SetSlidingExpiration(TimeSpan.FromSeconds(3600));
-        cacheEntryOptions.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(86400);
-
-        await _distributedCache.SetStringAsync($"Track-{track.Id}", JsonSerializer.Serialize(trackApiModel), cacheEntryOptions);
-
-        return trackApiModel;
+        return trackApiModels;
     }
-}
+
+    public async Task<TrackApiModel?> GetTrackById(int id)
+    {
+        var trackApiModelCached = await _distributedCache.GetStringAsync($"Track-{id}");
+
+        if (trackApiModelCached != null)
+        {
+            return JsonSerializer.Deserialize<TrackApiModel>(trackApiModelCached);
+        }
+        else
+        {
+            var track = await _trackRepository.GetById(id);
+            if (track == null) return null;
+            var trackApiModel = track.Convert();
+            trackApiModel.Genre = await GetGenreById(trackApiModel.GenreId);
+            trackApiModel.Album = await GetAlbumById(trackApiModel.AlbumId);
+            trackApiModel.MediaType = await GetMediaTypeById(trackApiModel.MediaTypeId);
+            if (trackApiModel.Album != null) trackApiModel.AlbumName = trackApiModel.Album.Title;
+
+            if (trackApiModel.MediaType != null) trackApiModel.MediaTypeName = trackApiModel.MediaType.Name;
+            if (trackApiModel.Genre != null) trackApiModel.GenreName = trackApiModel.Genre.Name;
+
+            DistributedCacheEntryOptions cacheEntryOptions = new DistributedCacheEntryOptions();
+            cacheEntryOptions.SetSlidingExpiration(TimeSpan.FromSeconds(3600));
+            cacheEntryOptions.AbsoluteExpirationRelativeToNow = TimeSpan.FromSeconds(86400);
+
+            await _distributedCache.SetStringAsync($"Track-{track.Id}", JsonSerializer.Serialize(trackApiModel),
+                cacheEntryOptions);
+
+            return trackApiModel;
+        }
+    }
 ```
