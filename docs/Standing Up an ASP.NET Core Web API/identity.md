@@ -27,13 +27,13 @@ dotnet add package Microsoft.AspNetCore.Identity.EntityFrameworkCore
 You can either restore a new database using a BAK file (if using MSSQL 2019) or run a SQL script if using older version of MSSQL.
 
 ### RESTORING UPDATED CHINOOK DB WITH BAK FILE
-Download the <a href="https://github.com/cwoodruff/aspnet-5-web-api-workshop/blob/main/module-1/01-09%20Identity%20in%20your%20Web%20API/database/ChinookWithIdentity.bak" target="_blank">Chinook database BAK file</a> for this part of the workshop in the GitHub repo. The file is a backup so we will restore it to where you have MSSQL 2019 installed.
+Download the <a href="https://github.com/cwoodruff/aspnet-6-web-api-workshop/blob/main/module-1/01-09%20Identity%20in%20your%20Web%20API/database/ChinookWithIdentity.bak" target="_blank">Chinook database BAK file</a> for this part of the workshop in the GitHub repo. The file is a backup so we will restore it to where you have MSSQL 2019 installed.
 
 ### RUN SQL SCRIPT TO ADD IDENTITY TABLES TO EXISTING CHINOOK DB
-If you don't have MSSQL 2019 installed you can update your Chinook database by running this <a href="https://github.com/cwoodruff/aspnet-5-web-api-workshop/blob/main/module-1/01-09%20Identity%20in%20your%20Web%20API/database/ChinookWithIdentity.sql" target="_blank">SQL script</a> against your database to add the tables needed for Identity for this part of the workshop.
+If you don't have MSSQL 2019 installed you can update your Chinook database by running this <a href="https://github.com/cwoodruff/aspnet-6-web-api-workshop/blob/main/module-1/01-09%20Identity%20in%20your%20Web%20API/database/ChinookWithIdentity.sql" target="_blank">SQL script</a> against your database to add the tables needed for Identity for this part of the workshop.
 
 ## UPDATE OUR APPSETTINGS.JSON IN API PROJECT
-**Note:** Will need to <a href="https://www.random.org/strings/" target="_blank">generate</a> your new 32 character string. 
+**Note:** Will need to <a href="https://pinetools.com/random-string-generator" target="_blank">generate</a> your new 32 character string. 
 
 ```json
 "JwtConfig": {
@@ -172,7 +172,6 @@ namespace ChinookASPNETWebAPI.Domain.Identity
 [Route("api/[controller]")]
 [ApiController]
 [EnableCors("CorsPolicy")]
-[ApiVersion( "1.0" )]
 public class HomeController : ControllerBase
 {
     private readonly ILogger<HomeController> _logger;
@@ -246,49 +245,59 @@ public class HomeController : ControllerBase
     [HttpPost, Route("Login")]
     public async Task<ActionResult<RegistrationResponse>> Login([FromBody] LoginModel user)
     {
-        if(ModelState.IsValid)
+        if (ModelState.IsValid)
         {
             // check if the user with the same email exist
             var existingUser = await _userManager.FindByEmailAsync(user.Email);
 
-            if(existingUser == null) 
+            if (existingUser == null)
             {
                 // We dont want to give to much information on why the request has failed for security reasons
-                return BadRequest(new RegistrationResponse() {
+                return BadRequest(new RegistrationResponse()
+                {
                     Result = false,
-                    Errors = new List<string>(){
+                    Errors = new List<string>()
+                    {
                         "Invalid authentication request"
-                    }});
+                    }
+                });
             }
 
             // Now we need to check if the user has inputed the right password
             var isCorrect = await _userManager.CheckPasswordAsync(existingUser, user.Password);
 
-            if(isCorrect)
+            if (isCorrect)
             {
                 var jwtToken = GenerateJwtToken(existingUser);
 
-                return Ok(new RegistrationResponse() {
-                    Result = true, 
+                return Ok(new RegistrationResponse()
+                {
+                    Result = true,
                     Token = jwtToken
                 });
             }
-            else 
+            else
             {
                 // We dont want to give to much information on why the request has failed for security reasons
-                return BadRequest(new RegistrationResponse() {
+                return BadRequest(new RegistrationResponse()
+                {
                     Result = false,
-                    Errors = new List<string>(){
+                    Errors = new List<string>()
+                    {
                         "Invalid authentication request"
-                    }});
+                    }
+                });
             }
         }
 
-        return BadRequest(new RegistrationResponse() {
+        return BadRequest(new RegistrationResponse()
+        {
             Result = false,
-            Errors = new List<string>(){
+            Errors = new List<string>()
+            {
                 "Invalid payload"
-            }});
+            }
+        });
     }
 
     private string GenerateJwtToken(IdentityUser user)
@@ -330,6 +339,9 @@ public class HomeController : ControllerBase
     }
 }
 ```
+
+## CALL IDENTITYDBCONTEXT ONMODELCREATING
+![](identity/2022-05-12_06-00-57.png)
 
 ## AUTHORIZE THE ALBUM CONTROLLER FOR IDENTITY IN API POJECT
 
