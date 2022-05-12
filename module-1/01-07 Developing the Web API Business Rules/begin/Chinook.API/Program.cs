@@ -6,6 +6,7 @@ builder.Services.AddAppSettings(builder.Configuration);
 builder.Services.AddConnectionProvider(builder.Configuration);
 builder.Services.ConfigureRepositories();
 builder.Services.ConfigureSupervisor();
+builder.Services.AddAPILogging();
 builder.Services.AddControllers();
 
 var app = builder.Build();

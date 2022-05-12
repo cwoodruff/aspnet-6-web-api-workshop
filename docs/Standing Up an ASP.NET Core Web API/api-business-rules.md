@@ -28,43 +28,36 @@ public static void AddCORS(this IServiceCollection services)
 UPDATE STARTUP.CS
 
 ```csharp
-public void ConfigureServices(IServiceCollection services)
-{
-    services.AddConnectionProvider(Configuration);
-    services.AddAppSettings(Configuration);
-    services.ConfigureRepositories();
-    services.ConfigureSupervisor();
-    services.ConfigureValidators();
-    services.AddAPILogging();
-    services.AddCORS();
-    services.AddHealthChecks();
-    services.AddControllers();
-}
+using Chinook.API.Configurations;
 
-// This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
-public void Configure(IApplicationBuilder app, IWebHostEnvironment env)
-{
-    if (env.IsDevelopment())
-    {
-        app.UseDeveloperExceptionPage();
-    }
+var builder = WebApplication.CreateBuilder(args);
 
-    app.UseHttpsRedirection();
+// Add services to the container.
+builder.Services.AddConnectionProvider(builder.Configuration);
+builder.Services.AddAppSettings(builder.Configuration);
+builder.Services.ConfigureRepositories();
+builder.Services.ConfigureSupervisor();
+builder.Services.ConfigureValidators();
+builder.Services.AddAPILogging();
+builder.Services.AddCORS();
 
-    app.UseRouting();
+var app = builder.Build();
+app.UseHttpLogging();
+app.UseHttpsRedirection();
+app.UseCors();
+app.MapControllers();
 
-    app.UseCors();
-
-    app.UseAuthorization();
-
-    app.UseEndpoints(endpoints =>
-    {
-        endpoints.MapControllers();
-    });
-}
+app.Run();
 ```
 
-
+## ADD CORS TO CONTROLLERS
+```csharp
+[Route("api/[controller]")]
+[ApiController]
+[EnableCors("CorsPolicy")]
+public class AlbumController : ControllerBase
+{
+```
 
 ## ADD FLUENTVALIDATION NUGET TO API AND DOMAIN PROJECTS
 
@@ -80,22 +73,119 @@ dotnet add package FluentValidation.AspNetCore
 ![](api-business-rules/Snag_c547dc4.png)
 
 ```csharp
-using ChinookASPNETWebAPI.Domain.ApiModels;
+using Chinook.Domain.ApiModels;
 using FluentValidation;
 
-namespace ChinookASPNETWebAPI.Domain.Validation
+namespace Chinook.Domain.Validation;
+
+public class AlbumValidator : AbstractValidator<AlbumApiModel>
 {
-    public class AlbumValidator : AbstractValidator<AlbumApiModel>
+    public AlbumValidator()
     {
-        public AlbumValidator()
-        {
-            RuleFor(a => a.Title).NotNull();
-            RuleFor(a => a.Title).MinimumLength(3);
-            RuleFor(a => a.Title).MaximumLength(160);
-            RuleFor(a => a.ArtistId).NotNull();
-        }
+        RuleFor(a => a.Title).NotNull();
+        RuleFor(a => a.Title).MinimumLength(3);
+        RuleFor(a => a.Title).MaximumLength(160);
+        RuleFor(a => a.ArtistId).NotNull();
     }
 }
+```
+
+## ADD VALIDATORS TO DEPENDENCY INJECTION IN STARTUP IN API PROJECT
+
+```csharp
+public static void ConfigureValidators(this IServiceCollection services)
+{
+    services.AddFluentValidation()
+        .AddTransient<IValidator<AlbumApiModel>, AlbumValidator>()
+        .AddTransient<IValidator<ArtistApiModel>, ArtistValidator>()
+        .AddTransient<IValidator<CustomerApiModel>, CustomerValidator>()
+        .AddTransient<IValidator<EmployeeApiModel>, EmployeeValidator>()
+        .AddTransient<IValidator<GenreApiModel>, GenreValidator>()
+        .AddTransient<IValidator<InvoiceApiModel>, InvoiceValidator>()
+        .AddTransient<IValidator<InvoiceLineApiModel>, InvoiceLineValidator>()
+        .AddTransient<IValidator<MediaTypeApiModel>, MediaTypeValidator>()
+        .AddTransient<IValidator<PlaylistApiModel>, PlaylistValidator>()
+        .AddTransient<IValidator<TrackApiModel>, TrackValidator>();
+}
+```
+
+### ADD CONFIGUREVALIDATORS TO CONFIGURESERVICES
+
+```csharp
+builder.Services.ConfigureValidators();
+```
+
+## GET VALIDATORS FROM DI IN SUPERVISOR
+
+```csharp
+public partial class ChinookSupervisor : IChinookSupervisor
+{
+    private readonly IAlbumRepository _albumRepository;
+    private readonly IArtistRepository _artistRepository;
+    private readonly ICustomerRepository _customerRepository;
+    private readonly IEmployeeRepository _employeeRepository;
+    private readonly IGenreRepository _genreRepository;
+    private readonly IInvoiceLineRepository _invoiceLineRepository;
+    private readonly IInvoiceRepository _invoiceRepository;
+    private readonly IMediaTypeRepository _mediaTypeRepository;
+    private readonly IPlaylistRepository _playlistRepository;
+    private readonly ITrackRepository _trackRepository;
+
+    private readonly IValidator<AlbumApiModel> _albumValidator;
+    private readonly IValidator<ArtistApiModel> _artistValidator;
+    private readonly IValidator<CustomerApiModel> _customerValidator;
+    private readonly IValidator<EmployeeApiModel> _employeeValidator;
+    private readonly IValidator<GenreApiModel> _genreValidator;
+    private readonly IValidator<InvoiceApiModel> _invoiceValidator;
+    private readonly IValidator<InvoiceLineApiModel> _invoiceLineValidator;
+    private readonly IValidator<MediaTypeApiModel> _mediaTypeValidator;
+    private readonly IValidator<PlaylistApiModel> _playlistValidator;
+    private readonly IValidator<TrackApiModel> _trackValidator;
+
+    public ChinookSupervisor(IAlbumRepository albumRepository,
+        IArtistRepository artistRepository,
+        ICustomerRepository customerRepository,
+        IEmployeeRepository employeeRepository,
+        IGenreRepository genreRepository,
+        IInvoiceLineRepository invoiceLineRepository,
+        IInvoiceRepository invoiceRepository,
+        IMediaTypeRepository mediaTypeRepository,
+        IPlaylistRepository playlistRepository,
+        ITrackRepository trackRepository,
+        IValidator<AlbumApiModel> albumValidator,
+        IValidator<ArtistApiModel> artistValidator,
+        IValidator<CustomerApiModel> customerValidator,
+        IValidator<EmployeeApiModel> employeeValidator,
+        IValidator<GenreApiModel> genreValidator,
+        IValidator<InvoiceApiModel> invoiceValidator,
+        IValidator<InvoiceLineApiModel> invoiceLineValidator,
+        IValidator<MediaTypeApiModel> mediaTypeValidator,
+        IValidator<PlaylistApiModel> playlistValidator,
+        IValidator<TrackApiModel> trackValidator
+    )
+    {
+        _albumRepository = albumRepository;
+        _artistRepository = artistRepository;
+        _customerRepository = customerRepository;
+        _employeeRepository = employeeRepository;
+        _genreRepository = genreRepository;
+        _invoiceLineRepository = invoiceLineRepository;
+        _invoiceRepository = invoiceRepository;
+        _mediaTypeRepository = mediaTypeRepository;
+        _playlistRepository = playlistRepository;
+        _trackRepository = trackRepository;
+
+        _albumValidator = albumValidator;
+        _artistValidator = artistValidator;
+        _customerValidator = customerValidator;
+        _employeeValidator = employeeValidator;
+        _genreValidator = genreValidator;
+        _invoiceValidator = invoiceValidator;
+        _invoiceLineValidator = invoiceLineValidator;
+        _mediaTypeValidator = mediaTypeValidator;
+        _playlistValidator = playlistValidator;
+        _trackValidator = trackValidator;
+    }
 ```
 
 ## ADD CODE TO CALL VALIDATION IN SUPERVISOR
@@ -128,43 +218,6 @@ public async Task<bool> UpdateAlbum(AlbumApiModel albumApiModel)
     return await _albumRepository.Update(album);
 }
 ```
-
-## ADD VALIDATORS TO DEPENDENCY INJECTION IN STARTUP IN API PROJECT
-
-```csharp
-public static void ConfigureValidators(this IServiceCollection services)
-{
-    services.AddFluentValidation()
-        .AddTransient<IValidator<AlbumApiModel>, AlbumValidator>()
-        .AddTransient<IValidator<ArtistApiModel>, ArtistValidator>()
-        .AddTransient<IValidator<CustomerApiModel>, CustomerValidator>()
-        .AddTransient<IValidator<EmployeeApiModel>, EmployeeValidator>()
-        .AddTransient<IValidator<GenreApiModel>, GenreValidator>()
-        .AddTransient<IValidator<InvoiceApiModel>, InvoiceValidator>()
-        .AddTransient<IValidator<InvoiceLineApiModel>, InvoiceLineValidator>()
-        .AddTransient<IValidator<MediaTypeApiModel>, MediaTypeValidator>()
-        .AddTransient<IValidator<PlaylistApiModel>, PlaylistValidator>()
-        .AddTransient<IValidator<TrackApiModel>, TrackValidator>();
-}
-```
-
-### ADD CONFIGUREVALIDATORS TO CONFIGURESERVICES
-
-```csharp
-public void ConfigureServices(IServiceCollection services)
-{
-    services.AddConnectionProvider(Configuration);
-    services.AddAppSettings(Configuration);
-    services.ConfigureRepositories();
-    services.ConfigureSupervisor();
-    services.ConfigureValidators();
-    services.AddAPILogging();
-    services.AddCORS();
-    services.AddHealthChecks();
-    services.AddControllers();
-}
-```
-
 
 ## ADD ERROR HANDLING IN ACTIONS
 
@@ -235,21 +288,21 @@ public class AlbumController : ControllerBase
     [Consumes("application/json")]
     public async Task<ActionResult<AlbumApiModel>> Post([FromBody] AlbumApiModel input)
     {
-        try  
-        {  
-            if (input == null)  
-            {  
+        try
+        {
+            if (input == null)
+            {
                 return StatusCode((int)HttpStatusCode.BadRequest, "Given Album is null");
-            }  
-            else  
+            }
+            else
             {
                 return Ok(await _chinookSupervisor.AddAlbum(input));
-            }  
+            }
         }
         catch (ValidationException  ex)  
         {  
-            _logger.LogError($"Something went wrong inside the AlbumController Add Album action: {ex}");  
-            return StatusCode((int)HttpStatusCode.InternalServerError, "Error occurred while executing Add Albums");  
+            _logger.LogError($"The Album could not validated: Add Album action: {ex}");  
+            return StatusCode((int)HttpStatusCode.InternalServerError, "Validation error while executing Add Albums");  
         }
         catch (Exception ex)  
         {  
@@ -276,8 +329,8 @@ public class AlbumController : ControllerBase
         }
         catch (ValidationException  ex)  
         {  
-            _logger.LogError($"Something went wrong inside the AlbumController Update Album action: {ex}");  
-            return StatusCode((int)HttpStatusCode.InternalServerError, "Error occurred while executing Update Albums");  
+            _logger.LogError($"The Album could not validated: Update Album action: {ex}");  
+            return StatusCode((int)HttpStatusCode.InternalServerError, "Validation error while executing Update Albums");  
         }
         catch (Exception ex)  
         {  
@@ -327,3 +380,4 @@ public class AlbumController : ControllerBase
 
 ## ERROR HANDLING AND RETURNING PROBLEM DETAILS
 
+For more details look at the <a href="https://github.com/cwoodruff/Chinook6WebAPI" target="_blank">Chinook6WebAPI repo in GitHub</a>.
