@@ -7,7 +7,7 @@ author: cwoodruff
 
 ## OPEN SOLUTION IN THE TESTING MODULE FOR UNIT TESTING
 
-\aspnet-5-web-api-workshop\module-2\02-01 Creating and using Unit Testing for your Web API\testing
+\aspnet-6-web-api-workshop\module-2\02-01 Creating and using Unit Testing for your Web API\testing
 
 ## EXPLORER THE ChinookASPNETWebAPI.UnitTest PROJECT AND UNDERSTAND THE TESTS
 

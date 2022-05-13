@@ -7,7 +7,7 @@ author: cwoodruff
 
 ## OPEN SOLUTION IN THE TESTING MODULE FOR INTEGRATION TESTING
 
-\aspnet-5-web-api-workshop\module-2\02-02 Creating and using Integrating Testing for your Web API\testing
+\aspnet-6-web-api-workshop\module-2\02-02 Creating and using Integrating Testing for your Web API\testing
 
 ## EXPLORER THE ChinookASPNETWebAPI.IntegrationTest PROJECT AND UNDERSTAND THE TESTS
 
@@ -16,6 +16,12 @@ This will give you a good insight into how to create unit tests for different co
 
 ![](integration-testing/Snag_d3d59d.png)
 
+## MODIFY THE PROGRAM FILE IN API PROJECT
+
+If you get an error that testhost.deps.json is missing then add the following to your API project's Program.cs
+```csharp
+public partial class Program { }
+```
 
 ## CREATE ADDITIONAL INTEGRATION TESTS
 

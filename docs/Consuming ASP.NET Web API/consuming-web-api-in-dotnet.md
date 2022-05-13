@@ -14,47 +14,39 @@ dotnet new console --name ChinookAPIClient
 ADD the following async method to the Program class 
 
 ```csharp
-private static async Task ProcessRepositories()
+static Task ProcessRepositories()
 {
+    
 }
+```
+## CREATE NEW STATIC INSTANCE OF HttpClinet
+
+```csharp
+// See https://aka.ms/new-console-template for more information
+
+HttpClient client = new HttpClient();
 ```
 
 ## REPLACE MAIN METHOD
 
 ```csharp
-static async Task Main(string[] args)
-{
-    await ProcessRepositories();
-}
-```
+// See https://aka.ms/new-console-template for more information
 
-## CREATE NEW STATIC INSTANCE OF HttpClinet
+HttpClient client = new HttpClient();
 
-```csharp
-namespace WebAPIClient
-{
-    class Program
-    {
-        private static readonly HttpClient client = new HttpClient();
-
-        static async Task Main(string[] args)
-        {
-            //...
-        }
-    }
-}
+await ProcessRepositories(client);
 ```
 
 ## ADD API CALL TO ProcessRepositories
 
 ```csharp
-private static async Task ProcessRepositories()
+static async Task ProcessRepositories(HttpClient client)
 {
     client.DefaultRequestHeaders.Accept.Clear();
     client.DefaultRequestHeaders.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
     client.DefaultRequestHeaders.Add("User-Agent", ".NET Console");
 
-    var stringTask = client.GetStringAsync("https://localhost:44320/api/v1/Customer");
+    var stringTask = client.GetStringAsync("https://localhost:7211/api/v1/Customer");
 
     var msg = await stringTask;
     Console.Write(msg);
